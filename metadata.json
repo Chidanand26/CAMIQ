@@ -1,0 +1,6 @@
+{
+  "name": "CAMIQ",
+  "description": "CAMIQ — Collaborative Intelligence for Existing Camera Infrastructure. Unified Campus Safety Orchestration Platform with CAMIQ SAFE (Student), CAMIQ RESPONSE (Guard), and CAMIQ COMMAND (Administrator).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

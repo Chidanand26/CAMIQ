@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">CAMIQ</string>
+    <string name="app_tagline">From student distress to coordinated campus response.</string>
+    <string name="app_subtitle">Collaborative Intelligence for Existing Camera Infrastructure</string>
+    <string name="role_preview_badge">ROLE PREVIEW (DEV ONLY)</string>
+    <string name="role_student">CAMIQ SAFE — Student</string>
+    <string name="role_guard">CAMIQ RESPONSE — Security Guard</string>
+    <string name="role_admin">CAMIQ COMMAND — Administrator</string>
+    <string name="status_disconnected">DISCONNECTED</string>
+    <string name="status_not_configured">NOT CONFIGURED</string>
+    <string name="status_not_available">NOT AVAILABLE</string>
+    <string name="status_not_connected">NOT CONNECTED</string>
+    <string name="status_coverage_gap">CAMERA COVERAGE GAP</string>
+    <string name="sos_hold_instruction">PRESS &amp; HOLD FOR 2 SECONDS TO TRIGGER SOS</string>
+    <string name="call_112_india">CALL 112 (INDIA EMERGENCY)</string>
+</resources>

@@ -1,0 +1,6 @@
+{
+  "summary":  "Architectural and UX plan to streamline CAMIQ into a minimal, single-screen-per-role interface featuring a CesiumJS 3D Digital Twin (inspired by bilawalsidhu/gods-eye-view) and a Browser WebRTC 3-Camera Web App + Android Companion architecture.",
+  "updatedAt":  "2026-11-01T07:04:22.102500267Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}
