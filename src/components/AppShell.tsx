@@ -1,13 +1,5 @@
 import { type ReactNode, useState } from "react";
-import {
-  Camera,
-  Link2,
-  Radio,
-  RefreshCw,
-  Shield,
-  Smartphone,
-  X,
-} from "lucide-react";
+import { Camera, Link2, RefreshCw, X } from "lucide-react";
 import {
   clearSyncBanner,
   pollSyncChannelNow,
@@ -27,8 +19,6 @@ export type AppShellProps = {
 };
 
 export function AppShell({
-  title,
-  subtitle,
   badge,
   onAutoAssignWebcams,
   usbCameraCount,
@@ -39,135 +29,103 @@ export function AppShell({
   const [roomInput, setRoomInput] = useState(store.sync.roomCode);
   const [serverInput, setServerInput] = useState(store.sync.laptopServerUrl);
 
-  const roles: { role: Role; label: string; route: string }[] = [
-    { role: "student", label: "SAFE · Student", route: "/student" },
-    { role: "guard", label: "RESPONSE · Guard", route: "/guard" },
-    { role: "admin", label: "COMMAND · Admin", route: "/admin" },
+  const roles: { role: Role; label: string }[] = [
+    { role: "student", label: "SAFE · Student" },
+    { role: "guard", label: "RESPONSE · Guard" },
+    { role: "admin", label: "COMMAND · Admin" },
   ];
 
-  const onlineCams = store.cameras.filter((c) => c.status === "ONLINE").length;
-
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
-      {/* Unified Header */}
-      <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
+    <div className="min-h-screen bg-[#05090d] text-foreground flex flex-col">
+      {/* Clean Glass Command Header */}
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#060c11]/90 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-primary/15 border border-primary/40 flex items-center justify-center shrink-0">
-              <Shield className="w-4 h-4 text-primary" />
+            <div className="w-8 h-8 rounded-full border border-[#00e5ff]/60 bg-[#00e5ff]/10 flex items-center justify-center text-[#00e5ff] font-bold text-sm shrink-0">
+              ◉
             </div>
             <div className="leading-tight truncate">
               <div className="flex items-center gap-2">
-                <span className="font-bold tracking-tight text-sm">CAMIQ</span>
-                <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary border border-primary/30">
-                  {badge}
+                <span className="font-extrabold tracking-widest text-sm">
+                  CAMIQ <span className="text-[#00e5ff] font-medium">{badge}</span>
                 </span>
-                {store.isAndroidApk && (
-                  <span className="inline-flex items-center gap-1 font-mono text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                    <Smartphone className="w-3 h-3" /> STUDENT APK
-                  </span>
-                )}
-                {!store.isAndroidApk && (
-                  <span className="hidden md:inline-flex items-center gap-1 font-mono text-[10px] px-2 py-0.5 rounded bg-secondary text-muted-foreground">
-                    <Radio className="w-3 h-3 text-emerald-400" /> {onlineCams}/3
-                    CAMS LIVE
-                  </span>
-                )}
+                <span className="hidden md:inline-flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  KLE TECH · HUBBALLI
+                </span>
               </div>
-              <p className="text-[11px] text-muted-foreground hidden sm:block truncate">
-                {title} — {subtitle}
+              <p className="font-mono text-[9px] tracking-widest text-muted-foreground uppercase hidden sm:block truncate">
+                B. V. BHOOMARADDI CAMPUS · COLLABORATIVE INTELLIGENCE NETWORK
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {/* APK <-> Website Live Sync Status Button */}
+            {/* APK <-> Website Sync Button */}
             <button
               type="button"
               onClick={() => setShowSyncBar((v) => !v)}
               data-testid="toggle-sync-config-btn"
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 font-mono text-[11px] font-semibold transition"
-              title="Configure Student APK ↔ Website Live Sync Room"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono text-[11px] transition"
+              title="Student APK ↔ Website Live Sync"
             >
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               <Link2 className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">
-                APK↔WEB: {store.sync.roomCode}
-              </span>
+              <span className="hidden md:inline">{store.sync.roomCode}</span>
             </button>
 
-            {/* 1-Click USB 3-Camera Auto-Assign for Laptop Demo */}
+            {/* 1-Click USB 3-Camera Connect */}
             {!store.isAndroidApk && (
               <button
                 type="button"
                 onClick={onAutoAssignWebcams}
                 data-testid="auto-connect-webcams-btn"
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-primary/15 hover:bg-primary/25 text-primary border border-primary/40 font-mono text-[11px] font-semibold transition"
-                title="Discover and bind up to 3 connected USB webcams to CAM-01, CAM-02, CAM-03"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#00e5ff]/15 hover:bg-[#00e5ff]/25 text-[#00e5ff] border border-[#00e5ff]/40 font-mono text-[11px] font-semibold transition"
               >
                 <Camera className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Auto-Connect 3 USB Cams</span>
-                <span className="px-1.5 py-0.2 rounded bg-primary/20 text-[10px]">
+                <span className="hidden sm:inline">Connect 3 Cams</span>
+                <span className="px-1.5 py-0.2 rounded bg-[#00e5ff]/20 text-[10px]">
                   {usbCameraCount}
                 </span>
               </button>
             )}
 
-            {/* Role Preview Switcher */}
-            <div
+            {/* Clean Role Dropdown / Switcher */}
+            <select
+              aria-label="Select Role View"
               data-testid="role-preview-bar"
-              className="flex items-center gap-1 px-2 py-1 rounded-md border border-warning/40 bg-warning/10 text-warning text-[11px] font-mono"
+              value={store.role}
+              onChange={(e) => setRole(e.target.value as Role)}
+              className="bg-[#060c11] border border-[#00e5ff]/40 text-[#00e5ff] rounded-lg px-2.5 py-1.5 font-mono text-xs font-semibold cursor-pointer focus:outline-none"
             >
-              <span className="hidden lg:inline font-bold mr-1">ROLE:</span>
               {roles.map((r) => (
-                <button
-                  key={r.role}
-                  type="button"
-                  data-testid={`switch-role-${r.role}`}
-                  onClick={() => setRole(r.role)}
-                  className={`px-2 py-0.5 rounded transition ${
-                    store.role === r.role
-                      ? "bg-warning text-warning-foreground font-semibold"
-                      : "hover:bg-warning/20"
-                  }`}
-                >
+                <option key={r.role} value={r.role} className="bg-[#060c11]">
                   {r.label}
-                </button>
+                </option>
               ))}
-            </div>
+            </select>
           </div>
         </div>
 
-        {/* Expandable APK <-> Website Sync Configuration Bar */}
+        {/* Expandable Sync Drawer */}
         {showSyncBar && (
-          <div className="border-t border-border bg-secondary/60 px-4 py-2.5">
-            <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+          <div className="border-t border-white/10 bg-[#060c11] px-4 py-2.5">
+            <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-emerald-400 font-semibold">
-                  ● APK ↔ WEBSITE LIVE BRIDGE:
-                </span>
-                <label className="flex items-center gap-1.5">
-                  <span className="text-muted-foreground">Room Code:</span>
-                  <input
-                    type="text"
-                    value={roomInput}
-                    onChange={(e) => setRoomInput(e.target.value)}
-                    className="bg-background border border-border rounded px-2 py-1 text-xs w-40 text-foreground"
-                    placeholder="CAMIQ-LIVE-2026"
-                  />
-                </label>
-                <label className="flex items-center gap-1.5">
-                  <span className="text-muted-foreground">
-                    Optional Laptop URL:
-                  </span>
-                  <input
-                    type="text"
-                    value={serverInput}
-                    onChange={(e) => setServerInput(e.target.value)}
-                    className="bg-background border border-border rounded px-2 py-1 text-xs w-48 text-foreground"
-                    placeholder="http://192.168.1.x:3000"
-                  />
-                </label>
+                <span className="text-emerald-400">APK↔WEB ROOM:</span>
+                <input
+                  type="text"
+                  value={roomInput}
+                  onChange={(e) => setRoomInput(e.target.value)}
+                  className="bg-black/50 border border-white/15 rounded px-2.5 py-1 text-xs w-40 text-foreground"
+                />
+                <input
+                  type="text"
+                  value={serverInput}
+                  onChange={(e) => setServerInput(e.target.value)}
+                  className="bg-black/50 border border-white/15 rounded px-2.5 py-1 text-xs w-44 text-foreground"
+                  placeholder="Optional Laptop IP"
+                />
                 <button
                   type="button"
                   onClick={() => {
@@ -177,50 +135,36 @@ export function AppShell({
                     });
                     pollSyncChannelNow();
                   }}
-                  className="px-2.5 py-1 rounded bg-primary text-primary-foreground font-semibold"
+                  className="px-2.5 py-1 rounded bg-[#00e5ff] text-[#05090d] font-semibold"
                 >
-                  Save & Connect
+                  Save
                 </button>
                 <button
                   type="button"
                   onClick={() => pollSyncChannelNow()}
-                  className="px-2.5 py-1 rounded border border-border bg-background hover:bg-secondary inline-flex items-center gap-1"
+                  className="px-2.5 py-1 rounded border border-white/15 hover:bg-white/10 inline-flex items-center gap-1"
                 >
-                  <RefreshCw className="w-3 h-3" /> Sync Now
+                  <RefreshCw className="w-3 h-3" /> Sync
                 </button>
               </div>
-
-              <div className="text-[11px] text-muted-foreground">
-                {store.sync.lanIps.length > 0 && (
-                  <span className="mr-3">
-                    Laptop LAN:{" "}
-                    <strong className="text-primary">
-                      http://{store.sync.lanIps[0]}:3000
-                    </strong>
-                  </span>
-                )}
-                <span>
-                  Last Sync:{" "}
-                  <strong className="text-foreground">
-                    {store.sync.lastSyncedAt ?? "Active"}
-                  </strong>
+              {store.sync.lanIps.length > 0 && (
+                <span className="text-[11px] text-muted-foreground">
+                  Laptop LAN: http://{store.sync.lanIps[0]}:3000
                 </span>
-              </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* Real-time Incoming APK / Website Event Banner */}
+        {/* Incoming Live Sync Toast */}
         {store.sync.lastSyncBanner && (
-          <div className="border-t border-primary/40 bg-primary/15 px-4 py-2">
-            <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 text-xs font-mono text-primary">
-              <span className="font-semibold truncate">
-                {store.sync.lastSyncBanner}
-              </span>
+          <div className="border-t border-[#00e5ff]/30 bg-[#00e5ff]/10 px-4 py-1.5">
+            <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 text-xs font-mono text-[#00e5ff]">
+              <span className="truncate">{store.sync.lastSyncBanner}</span>
               <button
                 type="button"
                 onClick={clearSyncBanner}
-                className="p-0.5 rounded hover:bg-primary/20"
+                className="p-0.5 rounded hover:bg-[#00e5ff]/20"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -229,7 +173,7 @@ export function AppShell({
         )}
       </header>
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-5">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-4">
         {children}
       </main>
     </div>

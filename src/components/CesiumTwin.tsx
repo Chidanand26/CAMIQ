@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { Compass, Eye, Layers, Orbit } from "lucide-react";
+import { Compass, MapPin, Orbit } from "lucide-react";
 import type { CameraLike } from "../lib/geo";
+import {
+  KLE_BOUNDARY_COORDS,
+  KLE_BUILDINGS,
+  KLE_CAMPUS,
+  KLE_RESPONDERS,
+} from "../lib/kleCampusData";
 import type { CamMode, IncidentRecord } from "../lib/store";
 
 declare global {
@@ -11,7 +17,7 @@ declare global {
 }
 
 export type CesiumTwinProps = {
-  center: [number, number];
+  center?: [number, number];
   cameras: CameraLike[];
   cameraModes: Record<string, CamMode>;
   incidents: IncidentRecord[];
@@ -20,49 +26,6 @@ export type CesiumTwinProps = {
   onPickPoint?: (lat: number, lng: number) => void;
   height?: string;
 };
-
-const CAMPUS_BUILDINGS = [
-  {
-    name: "Academic Block A",
-    dLat: 0.00022,
-    dLng: -0.00018,
-    w: 0.00018,
-    h: 0.00014,
-    elevation: 28,
-  },
-  {
-    name: "Robotics & AI Lab",
-    dLat: 0.00038,
-    dLng: 0.00042,
-    w: 0.0002,
-    h: 0.00015,
-    elevation: 34,
-  },
-  {
-    name: "Central Library Tower",
-    dLat: -0.00015,
-    dLng: 0.00012,
-    w: 0.00016,
-    h: 0.00016,
-    elevation: 42,
-  },
-  {
-    name: "North Student Residence",
-    dLat: -0.00034,
-    dLng: 0.00038,
-    w: 0.00022,
-    h: 0.00014,
-    elevation: 24,
-  },
-  {
-    name: "Main Gate Security Plaza",
-    dLat: -0.00004,
-    dLng: -0.00006,
-    w: 0.00012,
-    h: 0.0001,
-    elevation: 14,
-  },
-];
 
 function computeConePolygonLatLng(
   lat: number,
@@ -73,7 +36,7 @@ function computeConePolygonLatLng(
 ): number[] {
   const coords: number[] = [lng, lat];
   const half = fovDeg / 2;
-  const steps = 14;
+  const steps = 18;
   for (let i = 0; i <= steps; i++) {
     const ang = ((directionDeg - half + (fovDeg * i) / steps) * Math.PI) / 180;
     const dLat = (rangeM * Math.cos(ang)) / 111320;
@@ -85,14 +48,13 @@ function computeConePolygonLatLng(
 }
 
 export function CesiumTwin({
-  center,
   cameras,
   cameraModes,
   incidents,
   probePoint,
   safeWalkDest,
   onPickPoint,
-  height = "400px",
+  height = "420px",
 }: CesiumTwinProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -100,18 +62,38 @@ export function CesiumTwin({
   const onPickRef = useRef(onPickPoint);
   onPickRef.current = onPickPoint;
 
-  const [shader, setShader] = useState<"STD" | "NVG" | "FLIR">("STD");
-  const [activePov, setActivePov] = useState<string>("ORBIT");
+  const [sceneMode, setSceneMode] = useState<"2D" | "2.5D" | "3D">("3D");
+  const [selectedPov, setSelectedPov] = useState<string>("CAMPUS");
+  const [selectedBuildingId, setSelectedBuildingId] = useState<string>("");
   const [cesiumReady, setCesiumReady] = useState<boolean>(false);
 
-  // Initialize Cesium Viewer
+  // Initialize Cesium Viewer on KLE Tech Hubballi Satellite Imagery
   useEffect(() => {
     let cancelled = false;
-    const init = () => {
+    const init = async () => {
       const Cesium = window.Cesium;
       if (!Cesium || !containerRef.current || viewerRef.current) return;
 
       try {
+        let imageryProvider;
+        try {
+          if (Cesium.ArcGisMapServerImageryProvider?.fromUrl) {
+            imageryProvider =
+              await Cesium.ArcGisMapServerImageryProvider.fromUrl(
+                "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer",
+              );
+          } else {
+            imageryProvider = new Cesium.ArcGisMapServerImageryProvider({
+              url: "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer",
+            });
+          }
+        } catch {
+          imageryProvider = new Cesium.UrlTemplateImageryProvider({
+            url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+          });
+        }
+        if (cancelled || !containerRef.current) return;
+
         const viewer = new Cesium.Viewer(containerRef.current, {
           animation: false,
           baseLayerPicker: false,
@@ -125,20 +107,16 @@ export function CesiumTwin({
           timeline: false,
           navigationHelpButton: false,
           creditContainer: document.createElement("div"),
-          imageryProvider: new Cesium.UrlTemplateImageryProvider({
-            url: "https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
-            maximumLevel: 19,
-          }),
+          imageryProvider,
         });
 
         viewer.scene.globe.baseColor =
-          Cesium.Color.fromCssColorString("#090d16");
+          Cesium.Color.fromCssColorString("#05090d");
         viewer.scene.backgroundColor =
-          Cesium.Color.fromCssColorString("#090d16");
-        viewer.scene.fog.enabled = true;
-        viewer.scene.fog.density = 0.0003;
+          Cesium.Color.fromCssColorString("#05090d");
+        viewer.scene.fog.enabled = false;
 
-        // Click handler for coverage probe / SafeWalk destination
+        // Click handler for coverage probe / location pick
         const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         handler.setInputAction((movement: any) => {
@@ -157,13 +135,13 @@ export function CesiumTwin({
 
         viewer.camera.flyTo({
           destination: Cesium.Cartesian3.fromDegrees(
-            center[1],
-            center[0] - 0.0018,
-            240,
+            KLE_CAMPUS.longitude,
+            KLE_CAMPUS.latitude - 0.0042,
+            520,
           ),
           orientation: {
             heading: Cesium.Math.toRadians(0),
-            pitch: Cesium.Math.toRadians(-45),
+            pitch: Cesium.Math.toRadians(-48),
             roll: 0,
           },
           duration: 0,
@@ -172,13 +150,13 @@ export function CesiumTwin({
         viewerRef.current = viewer;
         if (!cancelled) setCesiumReady(true);
       } catch {
-        // Fallback if WebGL is unavailable in headless environment
+        // Fallback if WebGL unavailable
       }
     };
 
-    init();
+    void init();
     const timer = window.setInterval(() => {
-      if (!viewerRef.current && window.Cesium) init();
+      if (!viewerRef.current && window.Cesium) void init();
     }, 400);
 
     return () => {
@@ -189,10 +167,9 @@ export function CesiumTwin({
         viewerRef.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Re-sync 3D Entities whenever cameras, modes, incidents, or probe points update
+  // Re-sync KLE Tech Hubballi 3D Entities
   useEffect(() => {
     const Cesium = window.Cesium;
     const viewer = viewerRef.current;
@@ -200,51 +177,107 @@ export function CesiumTwin({
 
     viewer.entities.removeAll();
 
-    // 1. 3D Extruded Campus Buildings
-    CAMPUS_BUILDINGS.forEach((b) => {
-      const bLat = center[0] + b.dLat;
-      const bLng = center[1] + b.dLng;
+    // 1. KLE Tech Institutional Boundary Outline (OSM Way 381443665)
+    const boundaryFlat = KLE_BOUNDARY_COORDS.flatMap(([lon, lat]) => [
+      lon,
+      lat,
+    ]);
+    viewer.entities.add({
+      id: "kle-boundary",
+      polygon: {
+        hierarchy: Cesium.Cartesian3.fromDegreesArray(boundaryFlat),
+        height: 0,
+        material: Cesium.Color.fromCssColorString("#00d7ff").withAlpha(0.04),
+        outline: true,
+        outlineColor:
+          Cesium.Color.fromCssColorString("#00d7ff").withAlpha(0.85),
+      },
+    });
+
+    // 2. KLE Tech Hubballi Anchor Marker
+    viewer.entities.add({
+      id: "kle-anchor",
+      position: Cesium.Cartesian3.fromDegrees(
+        KLE_CAMPUS.anchorLng,
+        KLE_CAMPUS.anchorLat,
+        4,
+      ),
+      point: {
+        pixelSize: 8,
+        color: Cesium.Color.fromCssColorString("#00e5ff"),
+        outlineColor: Cesium.Color.BLACK,
+        outlineWidth: 2,
+      },
+      label: {
+        text: "KLE TECH · B. V. BHOOMARADDI CAMPUS",
+        font: "700 10px IBM Plex Mono, monospace",
+        fillColor: Cesium.Color.WHITE,
+        outlineColor: Cesium.Color.BLACK,
+        outlineWidth: 3,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        pixelOffset: new Cesium.Cartesian2(0, -16),
+      },
+    });
+
+    // 3. All 16 Real OSM Mapped 3D Extruded Buildings on KLE Tech Campus
+    KLE_BUILDINGS.forEach((b) => {
+      const flat = b.coords.flatMap(([lon, lat]) => [lon, lat]);
+      const fillHex =
+        b.category === "hostel_girl"
+          ? "#ec4899"
+          : b.category === "hostel_boy"
+            ? "#38bdf8"
+            : b.category === "innovation"
+              ? "#a855f7"
+              : "#55c7d9";
+      const outlineHex =
+        b.category === "hostel_girl"
+          ? "#fbcfe8"
+          : b.category === "hostel_boy"
+            ? "#bae6fd"
+            : "#a6f4ff";
+
       viewer.entities.add({
+        id: b.id,
         name: b.name,
         polygon: {
-          hierarchy: Cesium.Cartesian3.fromDegreesArray([
-            bLng - b.w / 2,
-            bLat - b.h / 2,
-            bLng + b.w / 2,
-            bLat - b.h / 2,
-            bLng + b.w / 2,
-            bLat + b.h / 2,
-            bLng - b.w / 2,
-            bLat + b.h / 2,
-          ]),
-          extrudedHeight: b.elevation,
-          material: Cesium.Color.fromCssColorString("#162338").withAlpha(0.82),
+          hierarchy: Cesium.Cartesian3.fromDegreesArray(flat),
+          height: 0,
+          extrudedHeight: b.height,
+          material: Cesium.Color.fromCssColorString(fillHex).withAlpha(0.38),
           outline: true,
           outlineColor:
-            Cesium.Color.fromCssColorString("#38bdf8").withAlpha(0.45),
+            Cesium.Color.fromCssColorString(outlineHex).withAlpha(0.9),
         },
-        position: Cesium.Cartesian3.fromDegrees(bLng, bLat, b.elevation + 6),
+        position: Cesium.Cartesian3.fromDegrees(
+          b.centerLng,
+          b.centerLat,
+          b.height + 5,
+        ),
         label: {
           text: b.name,
-          font: "600 11px JetBrains Mono, monospace",
-          fillColor: Cesium.Color.fromCssColorString("#94a3b8"),
-          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          outlineWidth: 2,
+          font: "600 10px IBM Plex Mono, monospace",
+          fillColor: Cesium.Color.WHITE,
           outlineColor: Cesium.Color.BLACK,
-          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 900),
+          outlineWidth: 3,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(
+            0,
+            1200,
+          ),
         },
       });
     });
 
-    // 2. 3D Volumetric Camera FOV Cones + Pylon Markers
+    // 4. 3D Volumetric Camera FOV Cones + Markers
     cameras.forEach((cam) => {
       const mode = cameraModes[cam.code] ?? "WATCH";
       const hex =
         mode === "INVESTIGATE"
-          ? "#f43f5e"
+          ? "#ff475e"
           : mode === "VERIFY"
-            ? "#f59e0b"
-            : "#22d3ee";
+            ? "#ffbf5f"
+            : "#00e5ff";
       const coneColor = Cesium.Color.fromCssColorString(hex);
       const flatDegrees = computeConePolygonLatLng(
         cam.lat,
@@ -259,8 +292,8 @@ export function CesiumTwin({
         polygon: {
           hierarchy: Cesium.Cartesian3.fromDegreesArray(flatDegrees),
           height: 0.5,
-          extrudedHeight: 8,
-          material: coneColor.withAlpha(mode === "INVESTIGATE" ? 0.34 : 0.2),
+          extrudedHeight: 6,
+          material: coneColor.withAlpha(mode === "INVESTIGATE" ? 0.32 : 0.16),
           outline: true,
           outlineColor: coneColor.withAlpha(0.85),
         },
@@ -268,7 +301,7 @@ export function CesiumTwin({
 
       viewer.entities.add({
         name: cam.code,
-        position: Cesium.Cartesian3.fromDegrees(cam.lng, cam.lat, 12),
+        position: Cesium.Cartesian3.fromDegrees(cam.lng, cam.lat, 8),
         point: {
           pixelSize: 11,
           color: coneColor,
@@ -276,46 +309,66 @@ export function CesiumTwin({
           outlineWidth: 2,
         },
         label: {
-          text: `${cam.code} [${mode}]\n${cam.status === "ONLINE" ? `${cam.fps} FPS` : cam.status}`,
-          font: "700 11px JetBrains Mono, monospace",
+          text: `${cam.code} [${mode}]`,
+          font: "700 10px IBM Plex Mono, monospace",
           fillColor: coneColor,
-          showBackground: true,
-          backgroundColor: Cesium.Color.fromCssColorString("#090d16").withAlpha(
-            0.85,
-          ),
-          pixelOffset: new Cesium.Cartesian2(0, -24),
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 3,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          pixelOffset: new Cesium.Cartesian2(0, -18),
         },
       });
     });
 
-    // 3. Active SOS & SafeWalk 3D Beacons
+    // 5. Security Responders on KLE Tech Campus
+    KLE_RESPONDERS.forEach((r) => {
+      viewer.entities.add({
+        position: Cesium.Cartesian3.fromDegrees(r.lng, r.lat, 4),
+        point: {
+          pixelSize: 9,
+          color: Cesium.Color.fromCssColorString("#66e6a2"),
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 2,
+        },
+        label: {
+          text: r.id,
+          font: "700 9px IBM Plex Mono, monospace",
+          fillColor: Cesium.Color.fromCssColorString("#a9ffd0"),
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 3,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          pixelOffset: new Cesium.Cartesian2(0, -14),
+        },
+      });
+    });
+
+    // 6. Active SOS & SafeWalk 3D Beacons
     incidents
       .filter((i) => i.status !== "RESOLVED" && i.status !== "CANCELLED")
       .forEach((inc) => {
         if (inc.lat == null || inc.lng == null) return;
-        const isSos = inc.kind === "sos";
-        const color = Cesium.Color.fromCssColorString(
-          isSos ? "#f43f5e" : "#f59e0b",
-        );
+        const color = Cesium.Color.fromCssColorString("#ff475e");
 
         viewer.entities.add({
           name: inc.ref,
           position: Cesium.Cartesian3.fromDegrees(inc.lng, inc.lat, 18),
           cylinder: {
             length: 36,
-            topRadius: 6,
+            topRadius: 7,
             bottomRadius: 1.5,
             material: color.withAlpha(0.55),
             outline: true,
-            outlineColor: color,
+            outlineColor: Cesium.Color.WHITE,
           },
           label: {
-            text: `🚨 ${inc.ref} (${inc.kind.toUpperCase()})\n${inc.student_name}`,
-            font: "700 12px JetBrains Mono, monospace",
+            text: `SOS · ${inc.ref}\n${inc.student_name}${inc.building_name ? ` (${inc.building_name})` : ""}`,
+            font: "700 11px IBM Plex Mono, monospace",
             fillColor: Cesium.Color.WHITE,
             showBackground: true,
-            backgroundColor: color.withAlpha(0.9),
-            pixelOffset: new Cesium.Cartesian2(0, -30),
+            backgroundColor: Cesium.Color.fromCssColorString(
+              "#8e1426",
+            ).withAlpha(0.92),
+            pixelOffset: new Cesium.Cartesian2(0, -28),
           },
         });
 
@@ -330,61 +383,28 @@ export function CesiumTwin({
                 inc.dest_lat,
                 4,
               ]),
-              width: 4,
-              material: Cesium.Color.fromCssColorString("#22d3ee"),
+              width: 3,
+              material: Cesium.Color.fromCssColorString("#00e5ff"),
             },
           });
         }
       });
 
-    // 4. Coverage Probe Marker
-    if (probePoint) {
+    // 7. Coverage Probe / Selected Point Marker
+    const markerPt = probePoint ?? safeWalkDest;
+    if (markerPt) {
       viewer.entities.add({
-        position: Cesium.Cartesian3.fromDegrees(
-          probePoint[1],
-          probePoint[0],
-          10,
-        ),
+        position: Cesium.Cartesian3.fromDegrees(markerPt[1], markerPt[0], 6),
         point: {
-          pixelSize: 12,
-          color: Cesium.Color.fromCssColorString("#f59e0b"),
-          outlineColor: Cesium.Color.WHITE,
+          pixelSize: 11,
+          color: Cesium.Color.fromCssColorString("#ffbf5f"),
+          outlineColor: Cesium.Color.BLACK,
           outlineWidth: 2,
-        },
-        label: {
-          text: "COVERAGE PROBE",
-          font: "700 10px JetBrains Mono, monospace",
-          fillColor: Cesium.Color.fromCssColorString("#f59e0b"),
-          pixelOffset: new Cesium.Cartesian2(0, -18),
-        },
-      });
-    }
-
-    // 5. SafeWalk Destination Marker
-    if (safeWalkDest) {
-      viewer.entities.add({
-        position: Cesium.Cartesian3.fromDegrees(
-          safeWalkDest[1],
-          safeWalkDest[0],
-          10,
-        ),
-        point: {
-          pixelSize: 12,
-          color: Cesium.Color.fromCssColorString("#10b981"),
-          outlineColor: Cesium.Color.WHITE,
-          outlineWidth: 2,
-        },
-        label: {
-          text: "SAFEWALK DESTINATION",
-          font: "700 10px JetBrains Mono, monospace",
-          fillColor: Cesium.Color.fromCssColorString("#10b981"),
-          pixelOffset: new Cesium.Cartesian2(0, -18),
         },
       });
     }
   }, [
     cesiumReady,
-    center,
     cameras,
     cameraModes,
     incidents,
@@ -392,125 +412,156 @@ export function CesiumTwin({
     safeWalkDest,
   ]);
 
-  const flyToOrbit = () => {
-    setActivePov("ORBIT");
+  const handlePovChange = (val: string) => {
+    setSelectedPov(val);
+    const Cesium = window.Cesium;
+    const viewer = viewerRef.current;
+    if (!Cesium || !viewer) return;
+
+    if (val === "CAMPUS") {
+      viewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(
+          KLE_CAMPUS.longitude,
+          KLE_CAMPUS.latitude - 0.0042,
+          520,
+        ),
+        orientation: {
+          heading: Cesium.Math.toRadians(0),
+          pitch: Cesium.Math.toRadians(-48),
+          roll: 0,
+        },
+        duration: 1.1,
+      });
+      return;
+    }
+
+    const cam = cameras.find((c) => c.code === val);
+    if (cam) {
+      viewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(cam.lng, cam.lat, 24),
+        orientation: {
+          heading: Cesium.Math.toRadians(cam.direction),
+          pitch: Cesium.Math.toRadians(-20),
+          roll: 0,
+        },
+        duration: 1.1,
+      });
+    }
+  };
+
+  const handleBuildingJump = (bId: string) => {
+    setSelectedBuildingId(bId);
+    const b = KLE_BUILDINGS.find((x) => x.id === bId);
+    if (!b) return;
+    onPickRef.current?.(b.centerLat, b.centerLng);
     const Cesium = window.Cesium;
     const viewer = viewerRef.current;
     if (!Cesium || !viewer) return;
     viewer.camera.flyTo({
       destination: Cesium.Cartesian3.fromDegrees(
-        center[1],
-        center[0] - 0.0018,
-        240,
+        b.centerLng,
+        b.centerLat - 0.0014,
+        190,
       ),
       orientation: {
         heading: Cesium.Math.toRadians(0),
         pitch: Cesium.Math.toRadians(-45),
         roll: 0,
       },
-      duration: 1.1,
+      duration: 1.0,
     });
   };
 
-  const flyToCameraPov = (cam: CameraLike) => {
-    setActivePov(cam.code);
-    const Cesium = window.Cesium;
+  const switchSceneMode = (mode: "2D" | "2.5D" | "3D") => {
+    setSceneMode(mode);
     const viewer = viewerRef.current;
-    if (!Cesium || !viewer) return;
-    viewer.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(cam.lng, cam.lat, 18),
-      orientation: {
-        heading: Cesium.Math.toRadians(cam.direction),
-        pitch: Cesium.Math.toRadians(-18),
-        roll: 0,
-      },
-      duration: 1.1,
-    });
+    if (!viewer || viewer.isDestroyed()) return;
+    if (mode === "2D") viewer.scene.morphTo2D(0.7);
+    if (mode === "3D") viewer.scene.morphTo3D(0.7);
+    if (mode === "2.5D") viewer.scene.morphToColumbusView(0.7);
   };
-
-  const shaderClass =
-    shader === "NVG"
-      ? "shader-nvg"
-      : shader === "FLIR"
-        ? "shader-flir"
-        : "";
 
   return (
     <div
       style={{ height }}
-      className="relative w-full rounded-xl overflow-hidden border border-border bg-card shadow-inner"
+      className="relative w-full rounded-xl overflow-hidden border border-border glass-card"
     >
-      {/* Cesium 3D Canvas */}
-      <div
-        ref={containerRef}
-        className={`w-full h-full ${shaderClass}`}
-      />
+      <div ref={containerRef} className="w-full h-full" />
 
-      {/* Top Left Tactical HUD Overlay */}
-      <div className="absolute top-3 left-3 z-10 flex flex-wrap items-center gap-1.5 pointer-events-auto">
-        <div className="px-2.5 py-1 rounded-md bg-background/90 backdrop-blur border border-primary/40 font-mono text-[11px] flex items-center gap-1.5 text-primary">
+      {/* Clean Top-Left Dropdowns: Building Jump + Camera POV */}
+      <div className="absolute top-3 left-3 z-10 flex flex-wrap items-center gap-2 pointer-events-auto">
+        <div className="px-2.5 py-1.5 rounded-lg bg-[#060c11]/90 backdrop-blur border border-[#00e5ff]/40 font-mono text-[10px] flex items-center gap-1.5 text-[#00e5ff]">
           <Orbit className="w-3.5 h-3.5" />
-          <span>CESIUM 3D DIGITAL TWIN</span>
+          <span className="font-semibold tracking-wider">
+            KLE TECH · HUBBALLI 3D TWIN
+          </span>
         </div>
 
-        <button
-          type="button"
-          onClick={flyToOrbit}
-          className={`px-2 py-1 rounded-md font-mono text-[10px] border transition ${
-            activePov === "ORBIT"
-              ? "bg-primary text-primary-foreground border-primary"
-              : "bg-background/85 text-foreground border-border hover:border-primary/50"
-          }`}
-        >
-          3D ORBIT
-        </button>
-
-        {cameras.map((cam) => (
-          <button
-            key={cam.id}
-            type="button"
-            onClick={() => flyToCameraPov(cam)}
-            className={`px-2 py-1 rounded-md font-mono text-[10px] border transition inline-flex items-center gap-1 ${
-              activePov === cam.code
-                ? "bg-primary text-primary-foreground border-primary"
-                : "bg-background/85 text-foreground border-border hover:border-primary/50"
-            }`}
+        {/* Dropdown 1: Jump to any KLE Tech Hubballi Building */}
+        <div className="flex items-center bg-[#060c11]/90 backdrop-blur border border-white/15 rounded-lg px-2 py-1">
+          <MapPin className="w-3 h-3 text-[#00e5ff] mr-1.5 shrink-0" />
+          <select
+            aria-label="Jump to KLE Tech Hubballi Building"
+            value={selectedBuildingId}
+            onChange={(e) => handleBuildingJump(e.target.value)}
+            className="bg-transparent font-mono text-[11px] text-foreground focus:outline-none cursor-pointer"
           >
-            <Eye className="w-3 h-3" /> POV {cam.code}
-          </button>
-        ))}
+            <option value="" className="bg-[#060c11]">
+              Jump to Campus Building...
+            </option>
+            {KLE_BUILDINGS.map((b) => (
+              <option key={b.id} value={b.id} className="bg-[#060c11]">
+                {b.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Dropdown 2: Camera View / POV Switcher */}
+        <select
+          aria-label="Select 3D Camera View"
+          value={selectedPov}
+          onChange={(e) => handlePovChange(e.target.value)}
+          className="bg-[#060c11]/90 backdrop-blur border border-white/15 rounded-lg px-2.5 py-1 font-mono text-[11px] text-foreground focus:outline-none cursor-pointer"
+        >
+          <option value="CAMPUS" className="bg-[#060c11]">
+            ⌖ 3D Campus Overview
+          </option>
+          {cameras.map((cam) => (
+            <option key={cam.id} value={cam.code} className="bg-[#060c11]">
+              POV · {cam.code} ({cam.name})
+            </option>
+          ))}
+        </select>
       </div>
 
-      {/* Top Right Shader Mode Switcher */}
-      <div className="absolute top-3 right-3 z-10 flex items-center gap-1 bg-background/90 backdrop-blur border border-border rounded-md p-1 pointer-events-auto">
-        <Layers className="w-3.5 h-3.5 text-muted-foreground mx-1" />
-        {(["STD", "NVG", "FLIR"] as const).map((mode) => (
+      {/* Clean Top-Right 2D / 2.5D / 3D Switcher */}
+      <div className="absolute top-3 right-3 z-10 flex items-center gap-1 bg-[#060c11]/90 backdrop-blur border border-white/15 rounded-lg p-1 pointer-events-auto">
+        {(["2D", "2.5D", "3D"] as const).map((m) => (
           <button
-            key={mode}
+            key={m}
             type="button"
-            onClick={() => setShader(mode)}
+            onClick={() => switchSceneMode(m)}
             className={`px-2 py-0.5 rounded font-mono text-[10px] font-semibold transition ${
-              shader === mode
-                ? "bg-primary text-primary-foreground"
+              sceneMode === m
+                ? "bg-[#00e5ff]/20 text-[#00e5ff] border border-[#00e5ff]/40"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            {mode}
+            {m}
           </button>
         ))}
       </div>
 
-      {/* Bottom Status Bar */}
-      <div className="absolute bottom-2.5 left-3 right-3 z-10 flex items-center justify-between px-3 py-1.5 rounded-md bg-background/85 backdrop-blur border border-border/80 font-mono text-[10px] text-muted-foreground pointer-events-none">
+      {/* Minimal Bottom Coordinate Bar */}
+      <div className="absolute bottom-2.5 left-3 right-3 z-10 flex items-center justify-between px-3 py-1.5 rounded-lg bg-[#060c11]/85 backdrop-blur border border-white/10 font-mono text-[10px] text-muted-foreground pointer-events-none">
         <span className="flex items-center gap-1.5">
-          <Compass className="w-3 h-3 text-primary" />
-          POV: <strong className="text-foreground">{activePov}</strong> · SHADER:{" "}
-          <strong className="text-foreground">{shader}</strong>
+          <Compass className="w-3 h-3 text-[#00e5ff]" />
+          <strong className="text-foreground">15.3693° N, 75.1224° E</strong> ·
+          B. V. Bhoomaraddi Campus, Hubballi
         </span>
-        <span>
-          {onPickPoint
-            ? "CLICK ANY POINT IN 3D TWIN TO PROBE CAMERA COVERAGE"
-            : "3D VOLUMETRIC FOV CONES + SOS BEACONS ACTIVE"}
+        <span className="hidden sm:inline text-[#00e5ff]">
+          SATELLITE + 16 OSM 3D BUILDINGS
         </span>
       </div>
     </div>

@@ -34,7 +34,6 @@ export function CameraTile({
 
   const [streaming, setStreaming] = useState(false);
   const [fps, setFps] = useState(0);
-  const [latencyMs, setLatencyMs] = useState(0);
   const [motionScore, setMotionScore] = useState(0);
   const [err, setErr] = useState<string | null>(null);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>(() => {
@@ -62,7 +61,6 @@ export function CameraTile({
           : localStorage.getItem(`camiq-device-${cam.id}`) ?? selectedDeviceId;
 
       try {
-        // Stop existing tracks before switching device
         const existing = videoRef.current?.srcObject as MediaStream | null;
         if (existing) {
           existing.getTracks().forEach((t) => t.stop());
@@ -109,7 +107,6 @@ export function CameraTile({
     [cam.id, selectedDeviceId, onRefreshDevices],
   );
 
-  // Listen for global "Auto-Connect 3 USB Webcams" event
   useEffect(() => {
     const handler = () => {
       const assigned = localStorage.getItem(`camiq-device-${cam.id}`) ?? "";
@@ -122,7 +119,6 @@ export function CameraTile({
     return () => window.removeEventListener("camiq-devices-updated", handler);
   }, [cam.id, startStream]);
 
-  // Auto-start if previously assigned in localStorage
   useEffect(() => {
     const assigned = localStorage.getItem(`camiq-device-${cam.id}`);
     if (assigned) {
@@ -137,7 +133,6 @@ export function CameraTile({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cam.id]);
 
-  // Real frame analysis loop: FPS, frame latency, pixel-diff motion, and jsQR decoding
   useEffect(() => {
     if (!streaming) return;
     let raf = 0;
@@ -197,7 +192,6 @@ export function CameraTile({
           }
         }
         frames++;
-        setLatencyMs(Math.round(performance.now() - t0));
       }
 
       const now = performance.now();
@@ -220,42 +214,29 @@ export function CameraTile({
       ? "bg-destructive/20 text-destructive border-destructive/40"
       : mode === "VERIFY"
         ? "bg-warning/20 text-warning border-warning/40"
-        : "bg-primary/15 text-primary border-primary/30";
-
-  const statusColor = streaming
-    ? "text-success border-success/40"
-    : err
-      ? "text-destructive border-destructive/40"
-      : "text-muted-foreground border-border";
+        : "bg-[#00e5ff]/15 text-[#00e5ff] border-[#00e5ff]/35";
 
   return (
     <div
       data-testid={`camera-tile-${cam.code}`}
-      className="rounded-xl border border-border bg-card/85 overflow-hidden flex flex-col shadow-sm"
+      className="rounded-xl glass-card overflow-hidden flex flex-col"
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border text-xs">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 text-xs">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="font-mono font-bold text-primary">{cam.code}</span>
+          <span className="font-mono font-bold text-[#00e5ff]">{cam.code}</span>
           <span className="font-medium truncate">{cam.name}</span>
           {enableQr && (
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/10 text-primary font-mono text-[10px]">
-              <QrCode className="w-3 h-3" /> QR GATE
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#00e5ff]/10 text-[#00e5ff] font-mono text-[10px]">
+              <QrCode className="w-3 h-3" /> QR
             </span>
           )}
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span
-            className={`px-2 py-0.5 rounded border font-mono text-[10px] font-semibold ${modeBadgeClass}`}
-          >
-            {mode}
-          </span>
-          <span
-            className={`px-2 py-0.5 rounded border font-mono text-[10px] ${statusColor}`}
-          >
-            {streaming ? "ONLINE" : err ? "ERROR" : cam.status}
-          </span>
-        </div>
+        <span
+          className={`px-2 py-0.5 rounded border font-mono text-[10px] font-semibold ${modeBadgeClass}`}
+        >
+          {mode}
+        </span>
       </div>
 
       {/* Video Viewport */}
@@ -269,33 +250,30 @@ export function CameraTile({
         <canvas ref={canvasRef} className="hidden" />
 
         {!streaming && (
-          <div className="text-center p-4 text-xs text-muted-foreground space-y-1.5">
-            <VideoOff className="w-6 h-6 mx-auto opacity-60" />
-            <div className="font-mono font-medium text-foreground/80">
-              {err ? `CAMERA ERROR: ${err}` : "USB WEBCAM READY TO CONNECT"}
-            </div>
-            <div className="text-[11px] max-w-[240px] mx-auto">
-              Select a connected USB webcam below or click Start Stream.
+          <div className="text-center p-4 text-xs text-muted-foreground space-y-1">
+            <VideoOff className="w-5 h-5 mx-auto opacity-60" />
+            <div className="font-mono text-[11px] text-foreground/80">
+              {err ? "CAMERA DISCONNECTED" : "USB WEBCAM READY"}
             </div>
           </div>
         )}
 
         {streaming && (
-          <div className="absolute top-2 left-2 flex items-center gap-1.5 px-2 py-0.5 rounded bg-black/70 border border-white/10 font-mono text-[10px] text-emerald-400">
+          <div className="absolute top-2 left-2 flex items-center gap-1.5 px-2 py-0.5 rounded bg-black/75 border border-white/15 font-mono text-[10px] text-emerald-400">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            LIVE · {fps} FPS · {latencyMs}ms
+            LIVE · {fps} FPS
           </div>
         )}
 
         {ackLabel && (
-          <div className="absolute bottom-2 left-2 right-2 bg-background/90 backdrop-blur border border-primary/40 rounded px-2 py-1 font-mono text-[10px] text-primary truncate">
+          <div className="absolute bottom-2 left-2 right-2 bg-[#060c11]/90 backdrop-blur border border-[#00e5ff]/40 rounded px-2 py-1 font-mono text-[10px] text-[#00e5ff] truncate">
             {ackLabel}
           </div>
         )}
       </div>
 
-      {/* USB Device Picker + Telemetry Footer */}
-      <div className="px-3 py-2 border-t border-border bg-secondary/20 space-y-2 text-[11px]">
+      {/* USB Device Dropdown + Controls */}
+      <div className="px-3 py-2 border-t border-white/10 bg-black/25 space-y-2 text-[11px]">
         <div className="flex items-center gap-1.5">
           <Camera className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
           <select
@@ -309,12 +287,12 @@ export function CameraTile({
                 void startStream(val);
               }
             }}
-            className="flex-1 min-w-0 bg-background border border-border rounded px-2 py-1 font-mono text-[11px] text-foreground truncate"
+            className="flex-1 min-w-0 bg-[#060c11] border border-white/15 rounded px-2 py-1 font-mono text-[11px] text-foreground truncate"
           >
             <option value="">Default / Auto Webcam</option>
             {availableDevices.map((d, idx) => (
               <option key={d.deviceId || idx} value={d.deviceId}>
-                {d.label || `USB Camera #${idx + 1} (${d.deviceId.slice(0, 6)})`}
+                {d.label || `USB Camera #${idx + 1}`}
               </option>
             ))}
           </select>
@@ -322,8 +300,8 @@ export function CameraTile({
             <button
               type="button"
               onClick={onRefreshDevices}
-              title="Refresh connected USB cameras"
-              className="p-1 rounded border border-border hover:bg-secondary text-muted-foreground hover:text-foreground"
+              title="Refresh USB cameras"
+              className="p-1 rounded border border-white/15 hover:bg-white/10 text-muted-foreground hover:text-foreground"
             >
               <RefreshCw className="w-3.5 h-3.5" />
             </button>
@@ -331,17 +309,12 @@ export function CameraTile({
         </div>
 
         <div className="flex items-center justify-between font-mono text-muted-foreground">
-          <div className="flex items-center gap-3">
-            <span>FPS {fps}</span>
-            <span>MOTION {motionScore}%</span>
-            <span>FOV {cam.fov}°</span>
-          </div>
+          <span>MOTION {motionScore}%</span>
           <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={() => triggerMotionCoordination(cam.code)}
-              title="Trigger neighbor camera coordination"
-              className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border hover:border-primary/50 text-foreground text-[10px]"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-white/15 hover:border-[#00e5ff]/50 text-foreground text-[10px]"
             >
               <Zap className="w-3 h-3 text-warning" /> Motion
             </button>
@@ -349,7 +322,7 @@ export function CameraTile({
               <button
                 type="button"
                 onClick={() => void startStream()}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-primary text-primary-foreground font-semibold text-[10px]"
+                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-[#00e5ff] text-[#05090d] font-semibold text-[10px]"
               >
                 <Video className="w-3 h-3" /> Start
               </button>
@@ -357,7 +330,7 @@ export function CameraTile({
               <button
                 type="button"
                 onClick={stopStream}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded border border-border hover:bg-secondary text-foreground text-[10px]"
+                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded border border-white/15 hover:bg-white/10 text-foreground text-[10px]"
               >
                 Stop
               </button>

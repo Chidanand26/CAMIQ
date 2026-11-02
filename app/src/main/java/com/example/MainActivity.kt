@@ -207,13 +207,13 @@ fun CamiqWebAppHost() {
     Scaffold(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF090D16)),
+            .background(Color(0xFF05090D)),
         contentWindowInsets = WindowInsets.safeDrawing
     ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFF090D16))
+                .background(Color(0xFF05090D))
                 .padding(innerPadding)
         ) {
             AndroidView(

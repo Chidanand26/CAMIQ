@@ -132,6 +132,7 @@ function camiqRealtimeSyncPlugin(): Plugin {
 
 export default defineConfig({
   base: "./",
+  publicDir: false,
   plugins: [react(), tailwindcss(), camiqRealtimeSyncPlugin()],
   server: {
     host: "0.0.0.0",

@@ -1,8 +1,10 @@
 import { useSyncExternalStore } from "react";
 import { type CameraLike, planCameras } from "./geo";
+import { KLE_CAMPUS } from "./kleCampusData";
 
 export type Role = "student" | "guard" | "admin";
 export type CamMode = "WATCH" | "VERIFY" | "INVESTIGATE";
+export type StudentGender = "girl" | "boy";
 
 declare global {
   interface Window {
@@ -23,6 +25,8 @@ export type IncidentRecord = {
   status: string;
   student_id: string;
   student_name: string;
+  student_gender?: StudentGender;
+  building_name?: string | null;
   lat: number | null;
   lng: number | null;
   dest_lat: number | null;
@@ -74,6 +78,7 @@ export type SyncConfig = {
 export type CamiqStoreState = {
   role: Role;
   isAndroidApk: boolean;
+  studentGender: StudentGender;
   sync: SyncConfig;
   studentProfile: {
     id: string;
@@ -112,9 +117,9 @@ type SyncEnvelope = {
   payload: any;
 };
 
-const STORAGE_KEY = "camiq_unified_web_state_v2";
-const BASE_LAT = 28.5450;
-const BASE_LNG = 77.1926;
+const STORAGE_KEY = "camiq_kletech_state_v3";
+const BASE_LAT = KLE_CAMPUS.latitude;
+const BASE_LNG = KLE_CAMPUS.longitude;
 const CLIENT_ID = `cli-${Math.random().toString(36).slice(2, 9)}`;
 
 function detectAndroidApk(): boolean {
@@ -125,17 +130,18 @@ function detectAndroidApk(): boolean {
   return false;
 }
 
+// KLE Tech Hubballi Campus Cameras
 const DEFAULT_CAMERAS: CameraLike[] = [
   {
     id: "cam-01",
     code: "CAM-01",
-    name: "Main Gate Entrance QR",
+    name: "Library Walkway & Gate",
     camera_type: "entrance",
-    lat: BASE_LAT,
-    lng: BASE_LNG,
-    direction: 45,
-    fov: 85,
-    range_m: 65,
+    lat: 15.36982,
+    lng: 75.12142,
+    direction: 115,
+    fov: 78,
+    range_m: 85,
     neighbors: ["CAM-02", "CAM-03"],
     status: "NOT ASSIGNED",
     fps: 0,
@@ -145,13 +151,13 @@ const DEFAULT_CAMERAS: CameraLike[] = [
   {
     id: "cam-02",
     code: "CAM-02",
-    name: "Robotics Lab Corridor",
+    name: "Academic Approach (BVBCET)",
     camera_type: "laboratory",
-    lat: BASE_LAT + 0.00035,
-    lng: BASE_LNG + 0.0004,
-    direction: 135,
-    fov: 90,
-    range_m: 60,
+    lat: 15.36895,
+    lng: 75.12238,
+    direction: 300,
+    fov: 82,
+    range_m: 95,
     neighbors: ["CAM-01", "CAM-03"],
     status: "NOT ASSIGNED",
     fps: 0,
@@ -161,13 +167,13 @@ const DEFAULT_CAMERAS: CameraLike[] = [
   {
     id: "cam-03",
     code: "CAM-03",
-    name: "North Academic Walkway",
+    name: "Main Path & C-LITE",
     camera_type: "corridor",
-    lat: BASE_LAT - 0.0003,
-    lng: BASE_LNG + 0.00035,
-    direction: 315,
-    fov: 95,
-    range_m: 70,
+    lat: 15.36952,
+    lng: 75.12302,
+    direction: 205,
+    fov: 70,
+    range_m: 75,
     neighbors: ["CAM-01", "CAM-02"],
     status: "NOT ASSIGNED",
     fps: 0,
@@ -181,6 +187,7 @@ function createInitialState(): CamiqStoreState {
   return {
     role: isApk ? "student" : "admin",
     isAndroidApk: isApk,
+    studentGender: "girl",
     sync: {
       roomCode: "CAMIQ-LIVE-2026",
       laptopServerUrl: "",
@@ -191,18 +198,18 @@ function createInitialState(): CamiqStoreState {
     },
     studentProfile: {
       id: "stu-01",
-      full_name: "Aarav Sharma",
-      student_id: "STU-2026-01",
-      department: "Robotics & CS",
+      full_name: "Ananya Deshpande",
+      student_id: "01FE24BCS042",
+      department: "CSE · KLE Tech Hubballi",
       campus_state: "OUT",
       on_duty: true,
     },
     guardOnDuty: true,
     sites: [
       {
-        id: "site-1",
-        name: "Main 3D Digital Twin Campus",
-        institution: "CAMIQ Institute of Technology",
+        id: "site-kletech",
+        name: "B. V. Bhoomaraddi Campus · Hubballi",
+        institution: "KLE Technological University",
         lat: BASE_LAT,
         lng: BASE_LNG,
       },
@@ -235,6 +242,8 @@ let state: CamiqStoreState = (() => {
           ...parsed,
           isAndroidApk: isApk,
           role: isApk ? "student" : parsed.role || "admin",
+          studentGender: parsed.studentGender || "girl",
+          sites: createInitialState().sites,
           sync: {
             ...createInitialState().sync,
             ...(parsed.sync ?? {}),
@@ -279,6 +288,26 @@ export function useCamiqStore(): CamiqStoreState {
   return useSyncExternalStore(subscribeStore, getStore, getStore);
 }
 
+export function setStudentGender(gender: StudentGender) {
+  state = {
+    ...state,
+    studentGender: gender,
+    studentProfile:
+      gender === "girl"
+        ? {
+            ...state.studentProfile,
+            full_name: "Ananya Deshpande",
+            student_id: "01FE24BCS042",
+          }
+        : {
+            ...state.studentProfile,
+            full_name: "Aarav Kulkarni",
+            student_id: "01FE24BCS018",
+          },
+  };
+  notify();
+}
+
 function getNtfyTopic(roomCode: string): string {
   const clean = roomCode
     .trim()
@@ -287,7 +316,6 @@ function getNtfyTopic(roomCode: string): string {
   return `camiq_live_sync_${clean || "camiq_live_2026"}`;
 }
 
-// Apply an incoming sync envelope from either the Student APK or the Website
 function applyIncomingEnvelope(env: SyncEnvelope) {
   if (!env || !env.id || processedEventIds.has(env.id)) return;
   processedEventIds.add(env.id);
@@ -301,17 +329,17 @@ function applyIncomingEnvelope(env: SyncEnvelope) {
     const incoming = env.payload.incident as IncidentRecord;
     const exists = state.incidents.some((i) => i.id === incoming.id);
     if (!exists) {
-      // Re-evaluate camera plan against current online cameras on the website
-      const lat = incoming.lat ?? BASE_LAT + 0.00012;
-      const lng = incoming.lng ?? BASE_LNG + 0.00012;
+      const lat = incoming.lat ?? BASE_LAT;
+      const lng = incoming.lng ?? BASE_LNG;
       const localPlan = planCameras(lat, lng, state.cameras).map((d) => ({
         code: d.camera.code,
         eligible: d.eligible,
         reason: d.reason,
       }));
       const nextModes = { ...state.cameraModes };
-      // Activate eligible cameras (or all 3 on SOS if none online yet so visual cone alert is unmistakable)
-      const eligibleCodes = localPlan.filter((p) => p.eligible).map((p) => p.code);
+      const eligibleCodes = localPlan
+        .filter((p) => p.eligible)
+        .map((p) => p.code);
       if (eligibleCodes.length > 0) {
         eligibleCodes.forEach((c) => {
           nextModes[c] = "INVESTIGATE";
@@ -324,10 +352,12 @@ function applyIncomingEnvelope(env: SyncEnvelope) {
       const enriched: IncidentRecord = {
         ...incoming,
         camera_plan:
-          eligibleCodes.length > 0 ? localPlan : incoming.camera_plan ?? localPlan,
+          eligibleCodes.length > 0
+            ? localPlan
+            : incoming.camera_plan ?? localPlan,
       };
 
-      const logLine = `${nowTime} [${fromLabel}] ${incoming.ref} (${incoming.kind.toUpperCase()}) reported by ${incoming.student_name}`;
+      const logLine = `${nowTime} [${fromLabel}] ${incoming.ref} (${incoming.kind.toUpperCase()}) · ${incoming.student_name}`;
       state = {
         ...state,
         cameraModes: nextModes,
@@ -337,7 +367,7 @@ function applyIncomingEnvelope(env: SyncEnvelope) {
           ...state.sync,
           connected: true,
           lastSyncedAt: nowTime,
-          lastSyncBanner: `📡 LIVE FROM ${fromLabel}: ${incoming.ref} (${incoming.kind.toUpperCase()}) — ${incoming.description || incoming.category || incoming.student_name}`,
+          lastSyncBanner: `📡 LIVE FROM ${fromLabel}: ${incoming.ref} · ${incoming.student_name} (${incoming.building_name || incoming.category || incoming.kind.toUpperCase()})`,
         },
       };
       notify();
@@ -468,14 +498,12 @@ function publishSyncEvent(
   processedEventIds.add(env.id);
   const rawJson = JSON.stringify(env);
 
-  // 1. BroadcastChannel (same browser / multi-tab)
   try {
     broadcastChannel?.postMessage(env);
   } catch {
     // ignore
   }
 
-  // 2. Cloud Pub/Sub Relay (ntfy.sh) for zero-config APK <-> Website sync over Wi-Fi or 5G
   const ntfyUrl = `https://ntfy.sh/${getNtfyTopic(state.sync.roomCode)}`;
   try {
     void fetch(ntfyUrl, {
@@ -491,7 +519,6 @@ function publishSyncEvent(
     // ignore
   }
 
-  // 3. Local Vite Server API (/api/camiq/event) + optional custom Laptop LAN IP
   if (window.location.protocol.startsWith("http")) {
     void fetch("/api/camiq/event", {
       method: "POST",
@@ -530,7 +557,7 @@ function parseNtfyLine(line: string) {
       applyIncomingEnvelope(outer as SyncEnvelope);
     }
   } catch {
-    // ignore non-JSON keepalives
+    // ignore
   }
 }
 
@@ -555,7 +582,6 @@ export function pollSyncChannelNow() {
     })
     .catch(() => {});
 
-  // Poll local / LAN server if available
   const endpoints: string[] = [];
   if (window.location.protocol.startsWith("http")) {
     endpoints.push("/api/camiq/events");
@@ -580,12 +606,10 @@ export function pollSyncChannelNow() {
 function setupRealtimeTransports() {
   if (typeof window === "undefined") return;
 
-  // Expose callback for Android native OkHttp polling bridge
   window.__onNativeSyncPoll = (rawLines: string) => {
     rawLines.split("\n").forEach(parseNtfyLine);
   };
 
-  // 1. BroadcastChannel + storage listener
   try {
     broadcastChannel?.close();
     broadcastChannel = new BroadcastChannel("camiq_realtime_bus");
@@ -596,7 +620,6 @@ function setupRealtimeTransports() {
     // ignore
   }
 
-  // 2. Cloud SSE Stream (ntfy.sh)
   try {
     cloudEventSource?.close();
     const topic = getNtfyTopic(state.sync.roomCode);
@@ -608,7 +631,6 @@ function setupRealtimeTransports() {
     // ignore
   }
 
-  // 3. Local Vite SSE Stream (/api/camiq/stream)
   if (window.location.protocol.startsWith("http")) {
     try {
       localEventSource?.close();
@@ -620,7 +642,6 @@ function setupRealtimeTransports() {
       // ignore
     }
 
-    // Discover laptop LAN IPs to display in header
     void fetch("/api/camiq/info")
       .then((r) => r.json())
       .then((info) => {
@@ -635,13 +656,11 @@ function setupRealtimeTransports() {
       .catch(() => {});
   }
 
-  // Initial catch-up poll
   pollSyncChannelNow();
 }
 
 if (typeof window !== "undefined") {
   setupRealtimeTransports();
-  // Continuous 2.2s catch-up poll so APK <-> Website sync never misses an event even behind strict firewalls
   window.setInterval(() => {
     pollSyncChannelNow();
   }, 2200);
@@ -754,6 +773,7 @@ export function raiseIncident(opts: {
   female_pref?: boolean;
   category?: string;
   description?: string;
+  building_name?: string;
 }) {
   if (typeof window !== "undefined") {
     try {
@@ -763,8 +783,8 @@ export function raiseIncident(opts: {
     }
   }
 
-  const lat = opts.lat ?? BASE_LAT + 0.00012;
-  const lng = opts.lng ?? BASE_LNG + 0.00012;
+  const lat = opts.lat ?? BASE_LAT;
+  const lng = opts.lng ?? BASE_LNG;
   const plan = planCameras(lat, lng, state.cameras).map((d) => ({
     code: d.camera.code,
     eligible: d.eligible,
@@ -790,11 +810,13 @@ export function raiseIncident(opts: {
     status: "OPEN",
     student_id: state.studentProfile.id,
     student_name: state.studentProfile.full_name,
+    student_gender: state.studentGender,
+    building_name: opts.building_name ?? null,
     lat,
     lng,
     dest_lat: opts.dest_lat ?? null,
     dest_lng: opts.dest_lng ?? null,
-    female_pref: opts.female_pref ?? false,
+    female_pref: opts.female_pref ?? state.studentGender === "girl",
     discreet: opts.discreet ?? false,
     category: opts.category ?? null,
     description: opts.description ?? null,
@@ -875,7 +897,6 @@ export function consumeGateToken(
   let nextPresence = currentPresence;
 
   if (!record) {
-    // If token starts with CAMIQ- and was scanned by physical webcam from Student APK before poll arrived, accept & register it
     if (/^CAMIQ-[A-Z0-9]{6,10}$/.test(clean)) {
       result = "ACCESS RECORDED";
       nextPresence = dir;
